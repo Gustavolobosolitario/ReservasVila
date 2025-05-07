@@ -1110,16 +1110,25 @@ def home_page():
                     # Verificar se as datas foram confirmadas, ou se não são finais de semana
                     if (dtRetirada.weekday() >= 5 and not st.session_state.retirada_confirmada) or (dtDevolucao.weekday() >= 5 and not st.session_state.devolucao_confirmada):
                         st.error('Por favor, confirme as datas selecionadas.')
+                    
+                    # Verificar se a data é no passado
                     elif dtRetirada < hoje or dtDevolucao < hoje:
                         st.error('Não é possível fazer uma reserva para uma data passada.')
+                    
+                    # Verificar se a data de devolução é anterior à de retirada
                     elif dtDevolucao < dtRetirada:
                         st.error('A data de devolução não pode ser anterior à data de retirada.')
+                    
                     else:
+                        # Se todas as verificações passaram, realizar a reserva
                         adicionar_reserva(dtRetirada, hrRetirada, dtDevolucao, hrDevolucao, descVeiculo, descDestino)
                         
-                        # Resetar confirmações
+                        # Resetar confirmações após o cadastro
                         st.session_state.retirada_confirmada = False
                         st.session_state.devolucao_confirmada = False
+
+                        # Exibir sucesso
+                        st.success('Reserva realizada com sucesso!')
 
         with st.form(key='buscar_reserva'):
             st.subheader('Consultar Reservas')
