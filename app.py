@@ -443,7 +443,6 @@ def criar_reserva_admin():
     st.subheader("Criar Reserva (Admin)")
     nome_completo = st.text_input("Nome Completo do Usuário")
     email_usuario = st.text_input("Email do Usuário")
-    # Inputs de data e hora
     dtRetirada = st.date_input("Data de Retirada", value=datetime.now().date())
     hrRetirada = st.time_input("Hora de Retirada", value=time(9, 0))
     dtDevolucao = st.date_input("Data de Devolução", value=datetime.now().date())
@@ -929,22 +928,18 @@ def exportar_df_para_csv(df, filename):
     
     
 def verificar_tabelas():
-    try:
-        with pymysql.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SHOW TABLES;")
-            tables = cursor.fetchall()
-            st.write('Tabelas existentes:', tables)
+    with pymysql.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        st.write('Tabelas existentes:', tables)
 
-            for table_name in [t[0] for t in tables]:
-                st.write(f'Colunas da tabela {table_name}:')
-                cursor.execute(f"DESCRIBE {table_name};")
-                columns = cursor.fetchall()
-                for column in columns:
-                    st.write(f'  {column[0]}')  # column[0] contém o nome da coluna
-    except pymysql.Error as e:
-        st.error(f"Erro ao verificar tabelas: {e}")
-  
+        for table_name in [t[0] for t in tables]:
+            st.write(f'Colunas da tabela {table_name}:')
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = cursor.fetchall() 
+            for column in columns:
+                st.write(f'  {column[1]}')    
     
     
 
@@ -1110,25 +1105,16 @@ def home_page():
                     # Verificar se as datas foram confirmadas, ou se não são finais de semana
                     if (dtRetirada.weekday() >= 5 and not st.session_state.retirada_confirmada) or (dtDevolucao.weekday() >= 5 and not st.session_state.devolucao_confirmada):
                         st.error('Por favor, confirme as datas selecionadas.')
-                    
-                    # Verificar se a data é no passado
                     elif dtRetirada < hoje or dtDevolucao < hoje:
                         st.error('Não é possível fazer uma reserva para uma data passada.')
-                    
-                    # Verificar se a data de devolução é anterior à de retirada
                     elif dtDevolucao < dtRetirada:
                         st.error('A data de devolução não pode ser anterior à data de retirada.')
-                    
                     else:
-                        # Se todas as verificações passaram, realizar a reserva
                         adicionar_reserva(dtRetirada, hrRetirada, dtDevolucao, hrDevolucao, descVeiculo, descDestino)
                         
-                        # Resetar confirmações após o cadastro
+                        # Resetar confirmações
                         st.session_state.retirada_confirmada = False
                         st.session_state.devolucao_confirmada = False
-
-                        # Exibir sucesso
-                        st.success('Reserva realizada com sucesso!')
 
         with st.form(key='buscar_reserva'):
             st.subheader('Consultar Reservas')
