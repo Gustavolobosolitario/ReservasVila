@@ -443,6 +443,7 @@ def criar_reserva_admin():
     st.subheader("Criar Reserva (Admin)")
     nome_completo = st.text_input("Nome Completo do Usuário")
     email_usuario = st.text_input("Email do Usuário")
+    # Inputs de data e hora
     dtRetirada = st.date_input("Data de Retirada", value=datetime.now().date())
     hrRetirada = st.time_input("Hora de Retirada", value=time(9, 0))
     dtDevolucao = st.date_input("Data de Devolução", value=datetime.now().date())
