@@ -94,13 +94,15 @@ def criar_tabelas():
                                 cidade VARCHAR(255),
                                 status VARCHAR(50)
                             )''')
-            cursor.execute('''CREATE TABLE IF NOT EXISTS tokens (
-                                id INT AUTO_INCREMENT PRIMARY KEY,
-                                email VARCHAR(255),
-                                token VARCHAR(255),
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                FOREIGN KEY (email) REFERENCES usuarios(email)
-                            )''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tokens (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(255),
+                    token VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (email) REFERENCES usuarios(email)
+                )
+            ''')
             conn.commit()
     except Exception as e:
         st.error(f"Erro ao criar tabelas: {e}")
