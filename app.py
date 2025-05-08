@@ -151,8 +151,11 @@ def validar_token(token):
             result = cursor.fetchone()
 
             if result:
+                # Log para verificar a data de criação e a data atual
+                print(f'Token válido. Token criado em: {result["created_at"]} - Agora: {datetime.now()}')
                 return True
             else:
+                print(f'Token expirado ou inválido.')
                 return False
     except pymysql.MySQLError as e:
         print(f'Erro ao validar token: {e}')
