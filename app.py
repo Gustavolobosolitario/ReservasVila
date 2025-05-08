@@ -133,6 +133,7 @@ import pymysql
 from datetime import datetime, timedelta
 
 def validar_token(token):
+    """Função para validar se o token é válido e não expirou"""
     try:
         with pymysql.connect(
             host='vudw.ddns.net',
@@ -142,7 +143,7 @@ def validar_token(token):
             cursorclass=pymysql.cursors.DictCursor
         ) as conn:
             cursor = conn.cursor()
-            # Verifica o token no banco e compara a data de criação com a data atual
+            # Verifica se o token existe e se foi criado dentro de um intervalo de 10 minutos
             cursor.execute('''
                 SELECT * FROM tokens
                 WHERE token = %s AND created_at >= NOW() - INTERVAL 10 MINUTE
@@ -220,6 +221,7 @@ def enviar_email_recovery(destinatario, link):
                 
         
 def resetar_senha():
+    """Função para permitir redefinir a senha com base no token recebido na URL"""
     st.title('Redefinir Senha')
 
     # Obtenção dos parâmetros da URL
@@ -231,8 +233,13 @@ def resetar_senha():
         st.error("Token inválido ou expirado.")
         return
 
+    # Verifica se o token é válido
+    if not validar_token(token):
+        st.error("Token inválido ou expirado.")
+        return
+
     try:
-        # Conectar ao banco MySQL
+        # Conectar ao banco MySQL para buscar o e-mail associado ao token
         with pymysql.connect(
             host='vudw.ddns.net',
             user='vudw',
@@ -255,6 +262,7 @@ def resetar_senha():
                 if nova_senha != confirmar_senha:
                     st.error("As senhas não correspondem.")
                 else:
+                    # Função para atualizar a senha no banco
                     if atualizar_senha_com_token(token, nova_senha):
                         st.success("Senha redefinida com sucesso!")
                         st.info("Agora você pode fazer login com sua nova senha.")
@@ -263,14 +271,9 @@ def resetar_senha():
     except Exception as e:
         st.error(f"Erro ao redefinir senha: {e}")
 
-
-
-        
-        
 def atualizar_senha_com_token(token, nova_senha):
-    senha_hash = hashlib.sha256(nova_senha.encode()).hexdigest()
+    """Função para atualizar a senha no banco de dados"""
     try:
-        # Conectar ao banco MySQL
         with pymysql.connect(
             host='vudw.ddns.net',
             user='vudw',
@@ -279,22 +282,21 @@ def atualizar_senha_com_token(token, nova_senha):
             cursorclass=pymysql.cursors.DictCursor
         ) as conn:
             cursor = conn.cursor()
-            # Atualizar a senha do usuário baseado no token
-            cursor.execute('''UPDATE usuarios SET senha = %s 
-                              WHERE email = (SELECT email FROM tokens WHERE token = %s)''', 
-                           (senha_hash, token))
-            # Excluir o token após o uso
+            # Atualiza a senha associada ao token
+            cursor.execute('''
+                UPDATE usuarios 
+                SET senha = %s 
+                WHERE email = (SELECT email FROM tokens WHERE token = %s)
+            ''', (nova_senha, token))
+            conn.commit()
+
+            # Após a atualização da senha, remove o token do banco (para evitar reutilização)
             cursor.execute('DELETE FROM tokens WHERE token = %s', (token,))
             conn.commit()
 
-            # Verificar se alguma linha foi afetada (se o token for válido)
-            if cursor.rowcount == 0:
-                st.error("Token inválido ou expirado.")
-                return False
-
-            return True
-    except pymysql.Error as e:
-        st.error(f"Erro ao atualizar a senha: {e}")
+        return True
+    except pymysql.MySQLError as e:
+        print(f'Erro ao atualizar senha: {e}')
         return False
 
         
