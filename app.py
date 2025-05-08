@@ -9,7 +9,7 @@ import base64
 from email.mime.text import MIMEText
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import string
 import warnings
@@ -150,9 +150,9 @@ def validar_token(token):
             ''', (token,))
             result = cursor.fetchone()
 
+            # Para debugging, imprima as informações de data e hora
             if result:
-                # Log para verificar a data de criação e a data atual
-                print(f'Token válido. Token criado em: {result["created_at"]} - Agora: {datetime.now()}')
+                print(f"Token válido. Token criado em: {result['created_at']} - Agora: {datetime.now()}")
                 return True
             else:
                 print(f'Token expirado ou inválido.')
@@ -577,10 +577,11 @@ def exibir_reservas_interativas():
         
 
 # Função para atualizar a senha do usuário
+# Função para atualizar a senha do usuário
 def atualizar_senha(email, nova_senha):
     senha_hash = hashlib.sha256(nova_senha.encode()).hexdigest()
     try:
-        with pymysql.connect(DB_PATH) as conn:
+        with pymysql.connect('reservas.db') as conn:
             cursor = conn.cursor()
             cursor.execute('UPDATE usuarios SET senha = ? WHERE email = ?', (senha_hash, email))
             conn.commit()
@@ -604,20 +605,12 @@ def recuperar_senha(email):
 
 def salvar_token_no_banco(email, token):
     try:
-        # Conexão com o banco de dados MySQL
-        with pymysql.connect(
-            host='vudw.ddns.net',
-            user='vudw',
-            password='Vilaurbe#2025!',
-            database='dataurbe',
-            cursorclass=pymysql.cursors.DictCursor
-        ) as conn:
+        with pymysql.connect('reservas.db') as conn:
             cursor = conn.cursor()
-            # Insere o token no banco de dados
-            cursor.execute('''INSERT INTO tokens (email, token) VALUES (%s, %s)''', (email, token))
+            cursor.execute('''INSERT INTO tokens (email, token) VALUES (?, ?)''', (email, token))
             conn.commit()
             
-    except pymysql.Error as e:
+    except Exception as e:
         print(f'Erro ao salvar token no banco de dados: {e}')
 
 
