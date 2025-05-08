@@ -127,7 +127,37 @@ def adicionar_usuario(nome_completo, email, senha):
     except Exception as e:
         st.error(f'Erro ao adicionar usuário: {e}')
 
-        
+
+
+import pymysql
+from datetime import datetime, timedelta
+
+def validar_token(token):
+    try:
+        with pymysql.connect(
+            host='vudw.ddns.net',
+            user='vudw',
+            password='Vilaurbe#2025!',
+            database='dataurbe',
+            cursorclass=pymysql.cursors.DictCursor
+        ) as conn:
+            cursor = conn.cursor()
+            # Verifica o token no banco e compara a data de criação com a data atual
+            cursor.execute('''
+                SELECT * FROM tokens
+                WHERE token = %s AND created_at >= NOW() - INTERVAL 10 MINUTE
+            ''', (token,))
+            result = cursor.fetchone()
+
+            if result:
+                return True
+            else:
+                return False
+    except pymysql.MySQLError as e:
+        print(f'Erro ao validar token: {e}')
+        return False
+
+
         
 
 # Função para verificar o usuário
