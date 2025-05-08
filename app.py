@@ -50,22 +50,9 @@ if 'nome_completo' not in st.session_state:
     
     
 # Função para carregar reservas do banco de dados com caching
-@st.cache_data
-def carregar_reservas_do_banco():
-    """Carrega as reservas do banco de dados com caching para melhorar a performance."""
-    try:
-        # Conectar ao banco MySQL
-        with pymysql.connect(
-            host='vudw.ddns.net',
-            user='vudw',
-            password='Vilaurbe#2025!',
-            database='dataurbe',
-            cursorclass=pymysql.cursors.DictCursor
-        ) as conn:
-            return pd.read_sql_query('SELECT * FROM reservas', conn)
-    except Exception as e:
-        st.error(f'Erro ao carregar reservas: {e}')
-        return pd.DataFrame()  # Retorna um DataFrame vazio em caso de erro
+
+
+
 
 # Função para limpar o cache de dados
 def limpar_cache():
@@ -309,9 +296,12 @@ def visualizar_reservas():
     st.markdown('</div>', unsafe_allow_html=True)        
         
         
+import pymysql
+import pandas as pd
+
+# Função para carregar as reservas do banco de dados MySQL
 def carregar_reservas_do_banco():
     try:
-        # Conectar ao banco MySQL
         with pymysql.connect(
             host='vudw.ddns.net',
             user='vudw',
@@ -319,11 +309,30 @@ def carregar_reservas_do_banco():
             database='dataurbe',
             cursorclass=pymysql.cursors.DictCursor
         ) as conn:
-            return pd.read_sql_query('SELECT * FROM reservas', conn)
+            df = pd.read_sql_query('SELECT * FROM reservas', conn)
+            return df
     except Exception as e:
         st.error(f'Erro ao carregar reservas: {e}')
         return pd.DataFrame()  # Retorna um DataFrame vazio em caso de erro
-      
+
+
+
+
+def testar_conexao():
+    try:
+        conexao = pymysql.connect(
+            host='vudw.ddns.net',
+            user='vudw',
+            password='Vilaurbe#2025!',
+            database='dataurbe',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        print("Conexão bem-sucedida!")
+        conexao.close()
+    except Exception as e:
+        print(f"Erro na conexão com o banco de dados: {e}")
+
+testar_conexao()
         
         
 def logout():
@@ -410,30 +419,6 @@ def registrar_reserva(nome_completo, email_usuario, dtRetirada, dtDevolucao, hrR
         
 
 
-def registrar_reserva(nome_completo, email_usuario, dtRetirada, dtDevolucao, hrRetirada, hrDevolucao, carro, cidade, status):
-    try:
-        # Conectar ao banco MySQL
-        with pymysql.connect(
-            host='vudw.ddns.net',
-            user='vudw',
-            password='Vilaurbe#2025!',
-            database='dataurbe',
-            cursorclass=pymysql.cursors.DictCursor
-        ) as conn:
-            cursor = conn.cursor()
-            # Inserir a reserva no banco de dados
-            cursor.execute('''INSERT INTO reservas (nome_completo, email_usuario, dtRetirada, dtDevolucao, hrRetirada, hrDevolucao, carro, cidade, status)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                           (nome_completo, email_usuario, dtRetirada, dtDevolucao, hrRetirada, hrDevolucao, carro, cidade, status))
-            conn.commit()
-
-            # Preparar e enviar notificação sobre a reserva
-            dados_reserva = f"Nome: {nome_completo}, Email: {email_usuario}, Data Retirada: {dtRetirada}, Data Devolução: {dtDevolucao}, Hora Retirada: {hrRetirada}, Hora Devolução: {hrDevolucao}, Carro: {carro}, Cidade: {cidade}, Status: {status}"
-            enviar_notificacao_reserva(dados_reserva)
-
-            st.success("Reserva registrada com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao registrar reserva: {e}")
 
 
 
@@ -486,7 +471,6 @@ def exportar_reservas_para_csv(df_reservas):
     href = f'<a href="data:file/csv;base64,{b64}" download="reservas.csv">Baixar CSV de todas as reservas</a>'
     st.markdown(href, unsafe_allow_html=True)       
                
-
 def exibir_reservas_interativas():
     df_reservas = carregar_reservas_do_banco()
     
@@ -548,7 +532,10 @@ def exibir_reservas_interativas():
                     
     else:
         st.warning('Nenhuma reserva selecionada')    
-        
+
+
+
+
         
         
 
@@ -726,7 +713,8 @@ def estilizar_reservas(df):
 # Função para filtrar reservas com base em critérios específicos
 def filtrar_reservas(df, dtRetirada=None, dtDevolucao=None, carros=None, cidades=None):
     if dtRetirada:
-        df = df[df['dtRetirada'] == pd.Timestamp(dtRetirada).strftime('%d/%m/%Y')]
+        df['dtRetirada'] = df['dtRetirada'].astype(str).str.strip()
+
     
     if dtDevolucao:
         df = df[df['dtDevolucao'] == pd.Timestamp(dtDevolucao).strftime('%d/%m/%Y')]
@@ -748,7 +736,8 @@ def buscar_reservas_filtros(dtRetirada=None, dtDevolucao=None, carros=None, cida
         
         
 def criar_df_para_visualizacao(df):
-    df['dtRetirada'] = pd.to_datetime(df['dtRetirada'], format='%d/%m/%Y')
+    df['dtRetirada'] = df['dtRetirada'].astype(str).str.strip()
+
     df['dtDevolucao'] = pd.to_datetime(df['dtDevolucao'], format='%d/%m/%Y')
     df['hrRetirada'] = pd.to_datetime(df['hrRetirada'], format='%H:%M:%S').dt.time
     df['hrDevolucao'] = pd.to_datetime(df['hrDevolucao'], format='%H:%M:%S').dt.time
@@ -756,26 +745,40 @@ def criar_df_para_visualizacao(df):
         
     
 # Função para verificar se o veículo está disponível
+
 def veiculo_disponivel(dtRetirada, hrRetirada, dtDevolucao, hrDevolucao, carro):
+    # Carregar as reservas
     df_reservas = carregar_reservas_do_banco()
 
-    # Convertendo as datas das reservas para o formato datetime.date
-    df_reservas['dtRetirada'] = pd.to_datetime(df_reservas['dtRetirada'], format='%d/%m/%Y').dt.date
-    df_reservas['dtDevolucao'] = pd.to_datetime(df_reservas['dtDevolucao'], format='%d/%m/%Y').dt.date
-    df_reservas['hrRetirada'] = pd.to_datetime(df_reservas['hrRetirada'], format='%H:%M:%S').dt.time
-    df_reservas['hrDevolucao'] = pd.to_datetime(df_reservas['hrDevolucao'], format='%H:%M:%S').dt.time
+    # Limpeza dos dados: Remove cabeçalho incorreto e espaços extras
+    df_reservas['dtRetirada'] = df_reservas['dtRetirada'].astype(str).str.strip()
+    df_reservas['dtDevolucao'] = df_reservas['dtDevolucao'].astype(str).str.strip()
 
-    dtRetirada_date = pd.to_datetime(dtRetirada).date()
-    dtDevolucao_date = pd.to_datetime(dtDevolucao).date()
+    # Convertendo as datas para o tipo datetime
+    df_reservas['dtRetirada'] = pd.to_datetime(df_reservas['dtRetirada'], dayfirst=True, errors='coerce')
+    df_reservas['dtDevolucao'] = pd.to_datetime(df_reservas['dtDevolucao'], dayfirst=True, errors='coerce')
 
-    for index, row in df_reservas.iterrows():
-        if row['carro'] == carro and row['status'] != 'Cancelado':
-            if dtRetirada_date <= row['dtDevolucao'] and dtDevolucao_date >= row['dtRetirada']:
-                if (hrRetirada >= row['hrRetirada'] and hrRetirada <= row['hrDevolucao']) or \
-                   (hrDevolucao >= row['hrRetirada'] and hrDevolucao <= row['hrDevolucao']) or \
-                   (hrRetirada <= row['hrRetirada'] and hrDevolucao >= row['hrDevolucao']):
-                    return False
-    return True    
+    # Convertendo as entradas de dtRetirada e dtDevolucao para datetime
+    dtRetirada = pd.to_datetime(dtRetirada, dayfirst=True, errors='coerce')
+    dtDevolucao = pd.to_datetime(dtDevolucao, dayfirst=True, errors='coerce')
+
+    # Verificando se o veículo já está reservado para o período solicitado
+    for index, reserva in df_reservas.iterrows():
+        if reserva['carro'] == carro:
+            # Verificando se há sobreposição de datas
+            if (dtRetirada >= reserva['dtRetirada'] and dtRetirada < reserva['dtDevolucao']) or \
+               (dtDevolucao > reserva['dtRetirada'] and dtDevolucao <= reserva['dtDevolucao']):
+                return "O veículo já está reservado para o período selecionado."
+
+    # Caso não haja sobreposição, o veículo está disponível
+    return "Veículo disponível para a reserva."
+
+# Testando a função
+resultado = veiculo_disponivel('01/05/2025', '10:00', '02/05/2025', '10:00', 'Carro A')
+print(resultado)
+
+resultado = veiculo_disponivel('04/05/2025', '10:00', '05/05/2025', '10:00', 'Carro A')
+print(resultado)
     
     
 def enviar_email_cancelamento(destinatario, detalhes_reserva):
@@ -821,47 +824,24 @@ Equipe Frota Vilaurbe
         print(f'Erro ao enviar email de cancelamento: {e}')
         st.error(f'Erro ao enviar email de cancelamento: {e}')
 
-def atualizar_status_reserva(selected_id):
+def atualizar_status_reserva(reserva_id):
     try:
-        # Certifique-se de que o selected_id é um número inteiro
-        selected_id = int(selected_id)
-
-        # Conectar ao banco de dados
-        with pymysql.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-
-            # Buscar detalhes da reserva ANTES de atualizar o status
-            cursor.execute("SELECT * FROM reservas WHERE id = %s", (selected_id,))
-            reserva_detalhes = cursor.fetchone()
-
-            if reserva_detalhes:
-                colunas = [column[0] for column in cursor.description]
-                detalhes_reserva_dict = dict(zip(colunas, reserva_detalhes))
-                email_reserva = detalhes_reserva_dict['email_usuario']
-
-                # Verificar se o usuário logado tem permissão para cancelar
-                if email_reserva == st.session_state.usuario_logado or st.session_state.usuario_logado == 'analytics@vilaurbe.com.br':
-                    # Atualizar o status da reserva para "Cancelado"
-                    cursor.execute("UPDATE reservas SET status = 'Cancelado' WHERE id = %s", (selected_id,))
-                    conn.commit()
-                    st.success('Reserva cancelada com sucesso!')
-
-                    # Enviar notificação por e-mail para analytics@vilaurbe.com.br
-                    enviar_email_cancelamento('analytics@vilaurbe.com.br', detalhes_reserva_dict)
-
-                    # Marcar para recarregar a tabela
-                    st.session_state.atualizar_tabela = True
-                    st.rerun()
-                else:
-                    st.error('Você não tem permissão para cancelar esta reserva.')
-            else:
-                st.error('Reserva não encontrada.')
-
-    except pymysql.Error as e:
-        st.error(f"Erro ao atualizar o status da reserva: {e}")
+        with pymysql.connect(
+            host='vudw.ddns.net',
+            user='vudw',
+            password='Vilaurbe#2025!',
+            database='dataurbe',
+            cursorclass=pymysql.cursors.DictCursor
+        ) as conn:
+            with conn.cursor() as cursor:
+                # Atualizar o status da reserva com base no ID
+                query = "UPDATE reservas SET status = 'Cancelado' WHERE id = %s"
+                cursor.execute(query, (reserva_id,))
+                conn.commit()
+            return True
     except Exception as e:
-        st.error(f"Erro inesperado: {e}")
-
+        st.error(f'Erro ao alterar o status da reserva: {e}')
+        return False
     
 
 # Função para exibir o botão de exportação apenas para o usuário autorizado
@@ -891,14 +871,15 @@ def carregar_reservas_do_csv():
                 st.dataframe(df_importado) # Exibir os dados importados
         except Exception as e:
             st.error(f"Erro ao ler o arquivo CSV: {e}")  
+            
+            
     
 def buscar_todas_reservas_do_banco():
     """
-    Busca todas as reservas do banco de dados SQLite reservas.db.
+    Busca todas as reservas do banco de dados MySQL e converte as colunas de data e hora.
     Retorna um DataFrame com todas as reservas.
     """
     try:
-
         # Conectar ao banco de dados MySQL
         conn = pymysql.connect(
             host='vudw.ddns.net',  # Endereço do servidor MySQL
@@ -908,14 +889,27 @@ def buscar_todas_reservas_do_banco():
             cursorclass=pymysql.cursors.DictCursor  # Para retornar resultados como dicionários
         )
 
-
         query = "SELECT * FROM reservas"  # Supondo que sua tabela de reservas se chama 'reservas'
         df_reservas = pd.read_sql_query(query, conn)
         conn.close()
+
+        # Garantindo que as colunas de data e hora estão no formato correto
+        df_reservas['dtRetirada'] = pd.to_datetime(df_reservas['dtRetirada'], format='%Y-%m-%d', errors='coerce')
+        df_reservas['dtDevolucao'] = pd.to_datetime(df_reservas['dtDevolucao'], format='%Y-%m-%d', errors='coerce')
+        df_reservas['hrRetirada'] = pd.to_datetime(df_reservas['hrRetirada'], format='%H:%M:%S', errors='coerce').dt.time
+        df_reservas['hrDevolucao'] = pd.to_datetime(df_reservas['hrDevolucao'], format='%H:%M:%S', errors='coerce').dt.time
+
         return df_reservas
     except pymysql.Error as e:
-        st.error(f"Erro ao acessar o banco de dados SQLite: {e}")
+        st.error(f"Erro ao acessar o banco de dados: {e}")
         return pd.DataFrame()
+
+# Exemplo de como você poderia exibir as reservas no Streamlit
+reservas = buscar_todas_reservas_do_banco()
+if not reservas.empty:
+    st.dataframe(reservas)
+else:
+    st.error("Não foi possível carregar as reservas.")
 
 def exportar_df_para_csv(df, filename):
     csv = df.to_csv(index=False).encode('utf-8')
@@ -1114,7 +1108,6 @@ def home_page():
                         
                         # Resetar confirmações
                         st.session_state.retirada_confirmada = False
-                        st.session_state.devolucao_confirmada = False
 
         with st.form(key='buscar_reserva'):
             st.subheader('Consultar Reservas')
